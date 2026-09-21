@@ -156,6 +156,13 @@ def build_record(
             review_reason=extraction.review_reason,
             decided_by=decided_by,
         )
+    if verdict is not None and verdict.review_reason is not None:
+        return submission_record(
+            category=category,
+            status="NEEDS_REVIEW",
+            review_reason=verdict.review_reason,
+            decided_by=decided_by,
+        )
     if verdict is not None and verdict.has_defect:
         return submission_record(
             category=category,
@@ -255,7 +262,7 @@ def run(
                     continue
 
             extraction = extract_email(email, category, client)
-            verdict = compare_pair(extraction) if extraction.ready else None
+            verdict = compare_pair(extraction) if extraction.ready and extraction.has_docs else None
             record = build_record(category, extraction, verdict, decided_by)
         except Exception:
             traceback.print_exc(file=sys.stderr)

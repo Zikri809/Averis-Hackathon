@@ -112,6 +112,7 @@ class Verdict:
     has_defect: bool = False
     defect_fields: list[str] = field(default_factory=list)
     diff_report: dict[str, dict] = field(default_factory=dict)
+    review_reason: str | None = None
 
     def __post_init__(self) -> None:
         unknown = [f for f in self.defect_fields if f not in COMPARE_FIELDS]
@@ -122,6 +123,12 @@ class Verdict:
                 "has_defect must equal bool(defect_fields): "
                 f"has_defect={self.has_defect}, defect_fields={self.defect_fields}"
             )
+        if self.review_reason is not None and self.review_reason not in REVIEW_REASONS:
+            raise ValueError(
+                f"review_reason must be one of {REVIEW_REASONS}, got {self.review_reason!r}"
+            )
+        if self.review_reason is not None and (self.has_defect or self.defect_fields):
+            raise ValueError("review verdicts cannot carry defect fields")
 
 
 def default_submission_record(category: str = "GENERAL") -> dict[str, Any]:
