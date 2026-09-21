@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -54,12 +55,17 @@ def compare_field(si_value, bl_value, field_name: str) -> bool:
     if field_name in ("container_count", "gross_weight_kg"):
         return float(si_value) == float(bl_value)
     if field_name in ("port_of_loading", "port_of_discharge"):
-        # Compare the name part only; never the LOCODE (v3-A5).
+        # Compare the name part only; never the LOCODE (v3-A5). A
+        # ``(WESTPORT)``-style qualifier is stripped for comparison but kept
+        # in evidence.
         from app.stage2.txt_parser import split_port
 
-        si_name, _ = split_port(str(si_value))
-        bl_name, _ = split_port(str(bl_value))
-        return norm_compare(si_name) == norm_compare(bl_name)
+        def port_name(value: str) -> str:
+            name, _code = split_port(str(value))
+            name = re.sub(r"\([^)]*\)", " ", name)
+            return norm_compare(name)
+
+        return port_name(si_value) == port_name(bl_value)
     return norm_compare(si_value) == norm_compare(bl_value)
 
 

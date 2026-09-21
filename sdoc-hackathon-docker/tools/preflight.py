@@ -93,6 +93,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--data", default=None, help="dataset dir (for inbox id comparison)")
     parser.add_argument("--server", default=None, help="organizers' inbox base URL")
     parser.add_argument("--dry-run", action="store_true", help="POST sample_submission (needs --server)")
+    parser.add_argument(
+        "--restart-check",
+        action="store_true",
+        help="step 6: docker compose restart, then re-run the dry-run (needs --server)",
+    )
     args = parser.parse_args(argv)
 
     try:
@@ -171,6 +176,46 @@ def main(argv: list[str] | None = None) -> int:
         _fail(f"n_emails={scoreboard.get('n_emails')}, expected 520 — do not believe final_score")
         return 1
     _ok(f"submitted: n_emails=520 final_score={scoreboard.get('final_score')}")
+
+    if args.restart_check:
+        # Step 6: bounce the service and re-prove the pipe. Ops executes the
+        # restart; this check asserts the service comes back healthy.
+        import subprocess
+        import time
+
+        compose_dir = Path(__file__).resolve().parent.parent
+        try:
+            subprocess.run(
+                ["docker", "compose", "restart"],
+                cwd=compose_dir,
+                check=True,
+                capture_output=True,
+                timeout=180,
+            )
+        except Exception as exc:
+            _fail(f"docker compose restart failed: {exc}")
+            return 2
+        deadline = time.time() + 60
+        health = None
+        while time.time() < deadline:
+            try:
+                health = _http_json(args.server.rstrip("/") + "/health")
+                break
+            except Exception:
+                time.sleep(2)
+        if health is None:
+            _fail("/health did not recover within 60s after restart")
+            return 1
+        try:
+            sample = _http_json(args.server.rstrip("/") + "/sample_submission")
+            after = _http_json(args.server.rstrip("/") + "/submit", sample)
+        except Exception as exc:
+            _fail(f"post-restart dry-run failed: {exc}")
+            return 2
+        if after.get("n_emails") != 520:
+            _fail(f"post-restart n_emails={after.get('n_emails')}, expected 520")
+            return 1
+        _ok(f"restart check: /health recovered, dry-run final_score={after.get('final_score')}")
     return 0
 
 
