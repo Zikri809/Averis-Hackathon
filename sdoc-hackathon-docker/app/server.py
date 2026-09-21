@@ -52,7 +52,20 @@ _last_run: dict = {}
 # helpers
 # ---------------------------------------------------------------------------
 def _data_source() -> str:
-    """Prefer the HTTP inbox service; fall back to the mounted dataset."""
+    """Pipeline input: the mounted dataset when present, else the inbox service.
+
+    The overlay mounts ``./data_v2`` at ``/data`` precisely so runs never pay
+    the per-attachment HTTP round-trip cost (an HTTP-source full run takes
+    ~8 min against the single-worker inbox; a mounted run takes seconds).
+    ``INBOX_URL`` is still the source for liveness (``/health``) and the
+    judge-facing ``POST /submit`` path runs outside this app.
+    """
+    local_inbox = state.DATA_DIR / "inbox"
+    try:
+        if local_inbox.is_dir() and any(local_inbox.glob("email_*.json")):
+            return str(state.DATA_DIR)
+    except OSError:
+        pass
     return INBOX_URL or str(state.DATA_DIR)
 
 

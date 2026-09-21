@@ -94,7 +94,7 @@ def save_cache(cache: dict[str, Any], path=None) -> None:
     target = path or state.llm_cache_path()
     target.parent.mkdir(parents=True, exist_ok=True)
     tmp = target.with_name(target.name + ".tmp")
-    tmp.write_text(json.dumps(cache, indent=2, sort_keys=True), encoding="utf-8")
+    tmp.write_text(json.dumps(cache, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     tmp.replace(target)
 
 
