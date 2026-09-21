@@ -49,10 +49,16 @@ def test_all_categories_and_statuses_valid(submission):
         assert record["has_defect"] == (record["status"] == "MISMATCH")
 
 
-def test_baseline_is_general_ok(submission):
-    """W0 has no stage logic: every email is GENERAL/OK (baseline ≈ 0.0124)."""
-    assert all(r["category"] == "GENERAL" for r in submission.values())
-    assert all(r["status"] == "OK" for r in submission.values())
+def test_submission_uses_stage1_categories(submission):
+    """W1+: classification is live, so the category mix matches the cascade.
+
+    Without stage 1 the run falls back to the GENERAL baseline; this test only
+    asserts the contract either way.
+    """
+    categories = {r["category"] for r in submission.values()}
+    assert categories <= set(CATEGORIES)
+    if run_module._load_attr("app.stage1_classify", "classify") is None:  # pragma: no cover
+        assert categories == {"GENERAL"}
 
 
 def test_zero_attachment_phrase_negatives_do_not_escalate(dataset, submission):
@@ -65,8 +71,13 @@ def test_zero_attachment_phrase_negatives_do_not_escalate(dataset, submission):
             matches.append(email["email_id"])
     assert len(matches) == 28
     for email_id in matches:
-        assert submission[email_id]["status"] == "OK", email_id
-        assert submission[email_id]["review_reason"] is None, email_id
+        record = submission[email_id]
+        if record["category"] == "BL_COMPARISON":
+            # The 5 genuine BL cases escalate with missing_attachment (506–510).
+            assert record["review_reason"] == "missing_attachment", email_id
+        else:
+            assert record["status"] == "OK", email_id
+            assert record["review_reason"] is None, email_id
 
 
 def test_gold_edge_cases_have_the_right_attachments(dataset):
