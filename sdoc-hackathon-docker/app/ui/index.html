@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<!--
+  Review dashboard (plan 05 X5 / plan 07 O3).
+
+  Static, no framework, no CDN. Display + local-write only: it fetches
+  /submission, /review and /outbox from the participant app and never reads
+  ground truth (G9).
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SDOC Review Dashboard</title>
+  <style>
+    :root { color-scheme: light dark; --line: #d5d9e0; --muted: #667085; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 24px;
+      font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    h1 { font-size: 20px; margin: 0 0 4px; }
+    h2 { font-size: 15px; margin: 28px 0 8px; }
+    .muted { color: var(--muted); }
+    .bar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin: 12px 0 4px; }
+    button {
+      font: inherit; padding: 6px 14px; border-radius: 6px;
+      border: 1px solid var(--line); background: #1f6feb; color: #fff; cursor: pointer;
+    }
+    button.secondary { background: transparent; color: inherit; }
+    button:disabled { opacity: .55; cursor: default; }
+    table { border-collapse: collapse; width: 100%; margin-top: 8px; }
+    th, td { border-bottom: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; }
+    th { font-weight: 600; color: var(--muted); }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+    .tag { display: inline-block; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--line); font-size: 12px; }
+    .tag.ok { background: #e7f6ec; color: #1a7f37; border-color: #b7e0c4; }
+    .tag.mismatch { background: #fdecea; color: #b42318; border-color: #f5c2bd; }
+    .tag.review { background: #fff5e0; color: #a15c07; border-color: #f0d9a8; }
+    .draft-banner {
+      background: #b42318; color: #fff; font-weight: 700; letter-spacing: .06em;
+      padding: 6px 10px; border-radius: 6px; display: inline-block; margin: 8px 0;
+    }
+    pre { background: rgba(127,127,127,.12); padding: 10px; border-radius: 6px; overflow: auto; }
+    #status { font-size: 13px; }
+  </style>
+</head>
+<body>
+  <h1>SDOC Review Dashboard</h1>
+  <p class="muted">
+    Display-only. Drafts are never sent. This page never reads ground truth.
+  </p>
+
+  <div class="bar">
+    <button id="run">Run pipeline</button>
+    <button id="refresh" class="secondary">Refresh</button>
+    <span id="status" class="muted">idle</span>
+  </div>
+
+  <h2>Submission summary</h2>
+  <div id="summary" class="muted">No submission loaded.</div>
+  <table id="summary-table" hidden>
+    <thead><tr><th>Category</th><th>Status</th><th>Count</th></tr></thead>
+    <tbody></tbody>
+  </table>
+
+  <h2>Review queue</h2>
+  <div id="queue" class="muted">Nothing to review.</div>
+  <table id="queue-table" hidden>
+    <thead><tr><th>Email</th><th>Reason</th><th>Label</th><th>Snippet</th><th>Confidence</th></tr></thead>
+    <tbody></tbody>
+  </table>
+
+  <h2>Draft outbox</h2>
+  <div id="outbox" class="muted">No drafts.</div>
+  <div id="draft"></div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    function setStatus(text) { $("status").textContent = text; }
+
+    async function getJSON(url) {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`${url} -> ${response.status}`);
+      return response.json();
+    }
+
+    function tagClass(status) {
+      if (status === "MISMATCH") return "tag mismatch";
+      if (status === "NEEDS_REVIEW") return "tag review";
+      return "tag ok";
+    }
+
+    function renderSummary(submission) {
+      const counts = new Map();
+      for (const record of Object.values(submission)) {
+        const key = `${record.category}|${record.status}`;
+        counts.set(key, (counts.get(key) || 0) + 1);
+      }
+      const body = $("summary-table").querySelector("tbody");
+      body.replaceChildren();
+      for (const [key, count] of [...counts].sort()) {
+        const [category, status] = key.split("|");
+        const row = document.createElement("tr");
+        const c1 = document.createElement("td");
+        c1.textContent = category;
+        const c2 = document.createElement("td");
+        const span = document.createElement("span");
+        span.className = tagClass(status);
+        span.textContent = status;
+        c2.appendChild(span);
+        const c3 = document.createElement("td");
+        c3.textContent = String(count);
+        row.append(c1, c2, c3);
+        body.appendChild(row);
+      }
+      $("summary").textContent = `${Object.keys(submission).length} records`;
+      $("summary-table").hidden = false;
+    }
+
+    function renderQueue(items) {
+      if (!items.length) {
+        $("queue").textContent = "Nothing to review.";
+        $("queue-table").hidden = true;
+        return;
+      }
+      const body = $("queue-table").querySelector("tbody");
+      body.replaceChildren();
+      for (const item of items) {
+        const row = document.createElement("tr");
+        for (const value of [
+          item.email_id, item.review_reason, item.label_found,
+          item.snippet, item.confidence,
+        ]) {
+          const cell = document.createElement("td");
+          cell.textContent = value === undefined || value === null ? "—" : String(value);
+          row.appendChild(cell);
+        }
+        body.appendChild(row);
+      }
+      $("queue").textContent = `${items.length} item(s)`;
+      $("queue-table").hidden = false;
+    }
+
+    function renderOutbox(items) {
+      if (!items.length) {
+        $("outbox").textContent = "No drafts.";
+        return;
+      }
+      $("outbox").replaceChildren();
+      for (const name of items) {
+        const button = document.createElement("button");
+        button.className = "secondary";
+        button.textContent = name;
+        button.onclick = () => showDraft(name);
+        $("outbox").appendChild(button);
+      }
+    }
+
+    async function showDraft(name) {
+      const text = await (await fetch(`/outbox/${encodeURIComponent(name)}`)).text();
+      $("draft").replaceChildren();
+      const banner = document.createElement("div");
+      banner.className = "draft-banner";
+      banner.textContent = "DRAFT — NOT SENT";
+      const pre = document.createElement("pre");
+      pre.textContent = text;
+      $("draft").append(banner, pre);
+    }
+
+    async function refresh() {
+      try {
+        const submission = await getJSON("/submission");
+        renderSummary(submission);
+      } catch { $("summary").textContent = "No submission loaded."; }
+      try {
+        renderQueue((await getJSON("/review")).items || []);
+      } catch { $("queue").textContent = "Review queue unavailable."; }
+      try {
+        renderOutbox((await getJSON("/outbox")).items || []);
+      } catch { $("outbox").textContent = "Outbox unavailable."; }
+    }
+
+    $("refresh").onclick = refresh;
+    $("run").onclick = async () => {
+      $("run").disabled = true;
+      setStatus("running…");
+      try {
+        const result = await (await fetch("/run", { method: "POST" })).json();
+        setStatus(`run complete: ${result.n_records} records`);
+        await refresh();
+      } catch (error) {
+        setStatus(`run failed: ${error.message}`);
+      } finally {
+        $("run").disabled = false;
+      }
+    };
+
+    refresh();
+  </script>
+</body>
+</html>

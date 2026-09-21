@@ -1,0 +1,34 @@
+# Participant app overlay (plan 07 O2).
+#
+#   docker compose -f docker-compose.yml -f docker-compose.app.yml up --build
+#
+# Attaches to the organizers' compose network so the app reaches the shipped
+# `inbox` service at http://inbox:8000. It never re-declares or duplicates
+# that service.
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.app
+    ports:
+      # 8001 on the host: 8080 is the organizers' inbox service.
+      - "${APP_PORT:-8001}:8001"
+    volumes:
+      # dataset is read-only; state and outbox are host-mounted so a restart
+      # preserves the checkpoint and the learned aliases (plan 07 DoD 7).
+      - ./data_v2:/data:ro
+      - ./state:/state
+      - ./outbox:/outbox
+    environment:
+      INBOX_URL: http://inbox:8000
+      DATA_DIR: /data
+      STATE_DIR: /state
+      OUTBOX_DIR: /outbox
+      APP_PORT: "8001"
+      # The demo runs live (extensions on). The frozen submission is produced
+      # by an explicit SCORED_RUN=1 invocation, not by this service.
+      SCORED_RUN: "0"
+      # REVEAL_GT is deliberately never set (plan 07 DoD 6).
+    depends_on:
+      - inbox
+    restart: unless-stopped
