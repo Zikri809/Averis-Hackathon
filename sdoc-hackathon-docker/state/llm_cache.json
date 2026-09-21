@@ -1,0 +1,34 @@
+{
+  "248dfe3136b5e2503bb3a5eacd2b7db9b7b74ddfd90002718911297382482167": {
+    "category": "INVOICE_QUERY",
+    "confidence": 0.85
+  },
+  "30bcfc01358e970559ff2f60605c928c75a79ac9fbaf53af1ea6e9394afe8b36": {
+    "category": "INVOICE_QUERY",
+    "confidence": 0.95
+  },
+  "31315fcd495964645bc36bdef80325973cdfaeaf43ecaebc8bd0fb20c22bf096": {
+    "category": "INVOICE_QUERY",
+    "confidence": 0.95
+  },
+  "34035261ed46d46964f3dc66fb1757f9dc0eb9ea316d7e0822f1f6d252dec320": {
+    "category": "INVOICE_QUERY",
+    "confidence": 1.0
+  },
+  "489015e3808dafb47268c23b489916b118fde6723729745168421489e5fff5c7": {
+    "category": "INVOICE_QUERY",
+    "confidence": 0.95
+  },
+  "be17c17dbb4051715f7d15e4bf626ad68e8983f9f5f8b96d91f5639d4b566804": {
+    "category": "INVOICE_QUERY",
+    "confidence": 0.95
+  },
+  "e129f17075be13538ed3d48df4d19ce6bf7a70fddc69c52ec3811e9e6d6b2cb8": {
+    "category": "INVOICE_QUERY",
+    "confidence": 0.95
+  },
+  "e1760decf4c39f25c6fdaa4c466ded544872778e08e9ae2589cdbbbfaa6855f1": {
+    "category": "INVOICE_QUERY",
+    "confidence": 0.9
+  }
+}

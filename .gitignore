@@ -5,8 +5,11 @@ __pycache__/
 .venv/
 venv/
 
-# Pipeline runtime state (checkpoints, cached submissions, learned aliases)
-sdoc-hackathon-docker/state/
+# Pipeline runtime state (checkpoints, cached submissions, learned aliases).
+# The frozen Stage-1 LLM cache is a submission artifact (plan 01 C6) and is
+# committed deliberately, so state/ is ignored by contents, not as a directory.
+sdoc-hackathon-docker/state/*
+!sdoc-hackathon-docker/state/llm_cache.json
 sdoc-hackathon-docker/submission.json
 
 # Draft emails are never committed (plan 07 O2)
