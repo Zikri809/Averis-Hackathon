@@ -131,8 +131,13 @@ def extract_email(email: dict, category: str, client: LoaderClient) -> Extractio
     return ExtractionResult(doc_status="NEEDS_REVIEW", review_reason="unreadable")
 
 
-def compare_pair(extraction: ExtractionResult) -> Verdict | None:
-    """Stage 3 hook; ``None`` means "no comparison module yet" (W0)."""
+def compare_pair(extraction: ExtractionResult) -> Verdict | ExtractionResult | None:
+    """Stage 3 hook; ``None`` means "no comparison module yet" (W0).
+
+    Stage 3 may defensively route a READY pair back to
+    ``NEEDS_REVIEW/missing_value`` when a null slips through or an identity
+    chain needs human review.
+    """
     compare = _load_attr("app.stage3_compare", "compare")
     if compare is None:
         return None
@@ -145,10 +150,12 @@ def compare_pair(extraction: ExtractionResult) -> Verdict | None:
 def build_record(
     category: str,
     extraction: ExtractionResult,
-    verdict: Verdict | None,
+    verdict: Verdict | ExtractionResult | None,
     decided_by: str | None = None,
 ) -> dict:
     """Map one email's outcome onto the exact submission record."""
+    if isinstance(verdict, ExtractionResult):
+        extraction = verdict
     if extraction.doc_status == "NEEDS_REVIEW":
         return submission_record(
             category=category,
