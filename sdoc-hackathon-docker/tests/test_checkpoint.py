@@ -47,7 +47,12 @@ def test_key_components_and_stability():
     assert key != make_key("email_001", "abc", alias_table_hash="alias", learned_alias_hash="learned", schema_version="3.1")
 
 
-def test_key_defaults_to_empty_hashes(monkeypatch, tmp_path):
+def test_key_defaults_use_the_resolved_hashes(monkeypatch, tmp_path):
+    """Defaults are ``state.alias_table_hash()``/``learned_alias_hash()``.
+
+    At W0 those are the empty hash; once plan 02 lands the alias-table hash is
+    the real table — either way the defaults must match the resolvers.
+    """
     monkeypatch.setenv("STATE_DIR", str(tmp_path))
     monkeypatch.setenv("SCORED_RUN", "0")
     import importlib
@@ -57,8 +62,8 @@ def test_key_defaults_to_empty_hashes(monkeypatch, tmp_path):
     assert key == make_key(
         "email_001",
         empty_hash(),
-        alias_table_hash=empty_hash(),
-        learned_alias_hash=empty_hash(),
+        alias_table_hash=state.alias_table_hash(),
+        learned_alias_hash=state.learned_alias_hash(),
         schema_version="3.0",
     )
     importlib.reload(state)

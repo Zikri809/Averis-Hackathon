@@ -79,11 +79,18 @@ def test_assert_520_accepts_needs_review_records():
     assert state.assert_520(submission) is True
 
 
-def test_alias_table_hash_falls_back_to_empty_hash():
-    assert state.alias_table_hash() == state.empty_hash if hasattr(state, "empty_hash") else True
+def test_alias_table_hash_resolves_to_the_published_table():
+    """W0 falls back to the empty hash; once plan 02 lands it is the real table."""
     from app.normalize import empty_hash
 
-    assert state.alias_table_hash() == empty_hash()
+    digest = state.alias_table_hash()
+    assert len(digest) == 64
+    try:
+        from app.stage2.aliases import ALIAS_TABLE_HASH
+
+        assert digest == ALIAS_TABLE_HASH
+    except ImportError:  # pragma: no cover - W0 only
+        assert digest == empty_hash()
 
 
 def test_learned_alias_hash_is_empty_hash_without_file(tmp_path, monkeypatch):
