@@ -59,10 +59,11 @@ from .schema import (
 #: History: ``w0`` = foundation stub (all-GENERAL baseline). ``w5`` = frozen
 #: pipeline with plans 00–06 landed (stage-1 cascade + frozen LLM cache,
 #: stage-2 text + doctype sniff, stage-3 deterministic compare, plan-05
-#: extensions fenced off under SCORED_RUN). Bump this on ANY behaviour change
+#: extensions fenced off under SCORED_RUN). ``w6`` = plan-03 binary parsers
+#: (xlsx/docx/pdf text layer) landed. Bump this on ANY behaviour change
 #: (a stale host-mounted checkpoint otherwise replays old records into the
 #: frozen submission — demonstrated 2026-09-21: 38/520 records went stale).
-PIPELINE_VERSION = "w5"
+PIPELINE_VERSION = "w6"
 
 #: v3-A1 — the only body phrase that escalates a zero-attachment BL request.
 MISSING_PHRASE = re.compile(r"dropped|still missing", re.IGNORECASE)

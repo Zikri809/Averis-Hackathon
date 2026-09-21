@@ -115,9 +115,9 @@ curl -s localhost:8001/review/resolve -X POST -H "Content-Type: application/json
 ```
 
 **Fallback:** the 20 edge cases are fixed and known (`email_501`–`email_520`);
-narrate them from the submission if the network drops. The queue holds 45
-items live (20 edges + 25 binary-decline); the resolve call above is also
-covered by `tests/test_server.py::test_resolve_confirms_an_escalation`.
+narrate them from the submission if the network drops. The queue holds those
+20 items live; the resolve call above is also covered by
+`tests/test_server.py::test_resolve_confirms_an_escalation`.
 
 ---
 
