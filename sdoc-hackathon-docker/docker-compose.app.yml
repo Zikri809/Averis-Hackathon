@@ -12,7 +12,7 @@ services:
       dockerfile: Dockerfile.app
     ports:
       # 8001 on the host: 8080 is the organizers' inbox service.
-      - "${APP_PORT:-8001}:8001"
+      - "${APP_PORT:-8001}:${APP_PORT:-8001}"
     volumes:
       # dataset is read-only; state and outbox are host-mounted so a restart
       # preserves the checkpoint and the learned aliases (plan 07 DoD 7).
@@ -24,7 +24,7 @@ services:
       DATA_DIR: /data
       STATE_DIR: /state
       OUTBOX_DIR: /outbox
-      APP_PORT: "8001"
+      APP_PORT: "${APP_PORT:-8001}"
       # The demo runs live (extensions on). The frozen submission is produced
       # by an explicit SCORED_RUN=1 invocation, not by this service.
       SCORED_RUN: "0"

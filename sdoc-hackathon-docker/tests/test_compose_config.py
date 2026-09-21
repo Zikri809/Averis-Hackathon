@@ -41,7 +41,8 @@ def test_app_uses_inbox_service_name_not_localhost():
 def test_app_port_does_not_collide_with_the_inbox():
     app = load("docker-compose.app.yml")["services"]["app"]
     published = [str(port) for port in app["ports"]]
-    assert published == ["${APP_PORT:-8001}:8001"]
+    assert published == ["${APP_PORT:-8001}:${APP_PORT:-8001}"]
+    assert app["environment"]["APP_PORT"] == "${APP_PORT:-8001}"
     assert not any("8080" in port for port in published)
 
 
@@ -73,3 +74,4 @@ def test_app_runs_on_its_own_port():
     text = (PROJECT_DIR / "Dockerfile.app").read_text(encoding="utf-8")
     assert "8001" in text
     assert "APP_PORT=8001" in text
+    assert "${APP_PORT:-8001}" in text

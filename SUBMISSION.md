@@ -125,7 +125,7 @@ Committed constants:
 |---|---|---|---|---|---|---|
 | Baseline (all GENERAL) | 2026-09-21 | 0.0414 | 0.0000 | 0/46 | 0.0124 | dry-run pipe proof |
 | W1 (classification live) | 2026-09-21 | 1.0000 | 0.0000 | 0/46 | 0.3000 | rules + sim + frozen cache |
-| W2 (text extraction) | 2026-09-21 | 1.0000 | 0.0000 | 0/46 | 0.3000 | awaits plan 04 comparison |
+| W2 (text extraction) | 2026-09-21 | 1.0000 | 0.0000 | 0/46 | 0.3000 | text extraction + wrong-doc sniff landed; awaits plan 04 comparison |
 | W3 (binary extraction) | _pending_ | | | | | awaits plans 03 + 04 |
 | W5 (frozen) | _pending_ | | | | | |
 
@@ -133,7 +133,6 @@ Committed constants:
 
 | Gap | Owner | Effect |
 |---|---|---|
-| `email_501`–`505` exit `missing_value` not `wrong_doc_type` | plan 03 (`doctype.py`) | 5 escalation reasons wrong; e2e unaffected |
 | 25 binary pairs exit `unreadable` | plan 03 (W2 router stub) | 13 binary defects + 12 OK pairs uncompared |
 | No comparison stage -> every pair `OK` | plan 04 (`stage3_compare.py`) | e2e 0/46; stage3 F1 0.0 |
 | Review queue / alias learning / draft email / fallback | plan 05 | extensions default-off; app returns empty projections |

@@ -21,6 +21,7 @@ from __future__ import annotations
 import json
 import os
 import threading
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -34,6 +35,7 @@ from .loader_client import LoaderClient
 APP_PORT = int(os.environ.get("APP_PORT", "8001"))
 INBOX_URL = os.environ.get("INBOX_URL", "").rstrip("/")
 HEALTH_TIMEOUT = float(os.environ.get("INBOX_HEALTH_TIMEOUT", "3"))
+STARTUP_WAIT_SECONDS = float(os.environ.get("INBOX_STARTUP_WAIT_SECONDS", "60"))
 
 app = FastAPI(
     title="SDOC Participant App",
@@ -70,6 +72,21 @@ def _inbox_health() -> dict:
         return {"reachable": False, "error": str(exc)}
 
 
+def _wait_for_inbox() -> None:
+    """Fail loudly if the app starts before the organizers' inbox is ready."""
+    if not INBOX_URL:
+        return
+    deadline = time.monotonic() + STARTUP_WAIT_SECONDS
+    last_error = "not checked"
+    while time.monotonic() < deadline:
+        health = _inbox_health()
+        if health.get("reachable"):
+            return
+        last_error = str(health.get("error") or health)
+        time.sleep(1)
+    raise RuntimeError(f"inbox health check failed after {STARTUP_WAIT_SECONDS:.0f}s: {last_error}")
+
+
 def _submission_payload() -> dict:
     path = state.submission_path()
     if not path.is_file():
@@ -95,6 +112,11 @@ def _extension(name: str):
 # ---------------------------------------------------------------------------
 # endpoints
 # ---------------------------------------------------------------------------
+@app.on_event("startup")
+def startup_wait_for_inbox():
+    _wait_for_inbox()
+
+
 @app.get("/health")
 def health():
     return {
