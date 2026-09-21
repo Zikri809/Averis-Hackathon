@@ -19,6 +19,7 @@ import re
 from typing import Callable
 
 from ..schema import COMPARE_FIELDS, DocRecord, ExtractionResult, FieldEvidence
+from . import doctype
 
 #: ``{extension: parser(text|bytes, source_format) -> DocRecord}``.
 _PARSERS: dict[str, Callable[..., DocRecord]] = {}
@@ -113,8 +114,21 @@ def extract_pair(email: dict, client) -> ExtractionResult:
     if si_path is None or bl_path is None:
         return ExtractionResult(doc_status="NEEDS_REVIEW", review_reason="missing_attachment")
 
-    si_doc = _read_and_parse(si_path, client)
-    bl_doc = _read_and_parse(bl_path, client)
+    si_data, si_read_error = _read_bytes(si_path, client)
+    bl_data, bl_read_error = _read_bytes(bl_path, client)
+
+    if si_read_error is not None or bl_read_error is not None:
+        si_doc = si_read_error or parse_attachment(si_path, si_data or b"", client)
+        bl_doc = bl_read_error or parse_attachment(bl_path, bl_data or b"", client)
+        return ExtractionResult(si_doc=si_doc, bl_doc=bl_doc, doc_status="NEEDS_REVIEW", review_reason="unreadable")
+
+    si_type = doctype.sniff(si_path, si_data)
+    bl_type = doctype.sniff(bl_path, bl_data)
+    if doctype.is_wrong_type(si_type, "SI") or doctype.is_wrong_type(bl_type, "BL"):
+        return ExtractionResult(doc_status="NEEDS_REVIEW", review_reason="wrong_doc_type")
+
+    si_doc = parse_attachment(si_path, si_data, client)
+    bl_doc = parse_attachment(bl_path, bl_data, client)
 
     if not si_doc.readable or not bl_doc.readable:
         return ExtractionResult(si_doc=si_doc, bl_doc=bl_doc, doc_status="NEEDS_REVIEW", review_reason="unreadable")
@@ -130,12 +144,18 @@ def extract_pair(email: dict, client) -> ExtractionResult:
 
 
 def _read_and_parse(path: str, client) -> DocRecord:
+    data, read_error = _read_bytes(path, client)
+    if read_error is not None:
+        return read_error
+    return parse_attachment(path, data, client)
+
+
+def _read_bytes(path: str, client) -> tuple[bytes, DocRecord | None]:
     try:
-        data = client.read_bytes(path)
+        return client.read_bytes(path), None
     except Exception:
         suffix = ("." + str(path).rsplit(".", 1)[-1].lower()) if "." in str(path) else ""
-        return _unreadable(suffix.lstrip(".") or "txt", "read failure")
-    return parse_attachment(path, data, client)
+        return b"", _unreadable(suffix.lstrip(".") or "txt", "read failure")
 
 
 def _register_text_route() -> None:

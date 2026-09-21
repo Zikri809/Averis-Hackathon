@@ -73,6 +73,7 @@ def parse_text(text: str, source_format: str = "txt") -> DocRecord:
     raw_labels: dict[str, str] = {}
     values: dict[str, str] = {}
     continuations: dict[str, list[str]] = {}
+    duplicate_values: dict[str, list[str]] = {}
     pending_field: str | None = None
     unknown_labels: list[str] = []
 
@@ -107,13 +108,7 @@ def parse_text(text: str, source_format: str = "txt") -> DocRecord:
         if field_name in values and not is_blank(values[field_name]):
             # Two lines for the same field: keep the first non-blank and note
             # the conflict in evidence (display-only confidence 0.5).
-            evidence[field_name] = FieldEvidence(
-                value=None,
-                raw=raw_value,
-                label_found=raw_label,
-                source_format=source_format,
-                confidence=0.5,
-            )
+            duplicate_values.setdefault(field_name, []).append(raw_value)
             pending_field = field_name
             continue
 
@@ -141,12 +136,13 @@ def parse_text(text: str, source_format: str = "txt") -> DocRecord:
             value = parse_weight(raw_value, source_format)
 
         fields[field_name] = value
+        raw_parts = [part for part in (raw_value, chain, *duplicate_values.get(field_name, [])) if part]
         evidence[field_name] = FieldEvidence(
             value=value,
-            raw=chain or raw_value or None,
+            raw=" | ".join(raw_parts) or None,
             label_found=raw_label,
             source_format=source_format,
-            confidence=1.0,
+            confidence=0.5 if field_name in duplicate_values else 1.0,
         )
 
     doc = DocRecord(fields=fields, readable=True, source_format=source_format, evidence=evidence)
