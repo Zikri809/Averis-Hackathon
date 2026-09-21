@@ -124,9 +124,9 @@ class Verdict:
             )
 
 
-def default_submission_record() -> dict[str, Any]:
-    """The W0 baseline record: GENERAL / OK."""
-    return submission_record()
+def default_submission_record(category: str = "GENERAL") -> dict[str, Any]:
+    """The baseline record: ``GENERAL``/``OK`` (category overrideable)."""
+    return submission_record(category=category)
 
 
 def submission_record(
