@@ -153,7 +153,7 @@ record invariant before anything is sent, then submits and checks the returned
 | App container unhealthy | `docker compose -f docker-compose.yml -f docker-compose.app.yml restart app` |
 | Inbox service down | `docker compose up -d` (from `sdoc-hackathon-docker/`) |
 | Port 8080 taken | change the `ports:` mapping in `docker-compose.yml` |
-| Port 8001 taken | `APP_PORT=8002 docker compose ... up -d` |
+| Port 8001 taken | `APP_PORT=8002 docker compose ... up -d`, then use `http://localhost:8002/ui` |
 | Run looks stale | delete `state/checkpoint.jsonl` and re-run |
 | Network dies at step 3 or 5 | switch to the recorded clip |
 

@@ -35,6 +35,6 @@ ENV DATA_DIR=/data \
 EXPOSE 8001
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8001/health').status==200 else 1)"
+    CMD python -c "import os,urllib.request,sys; port=os.environ.get('APP_PORT','8001'); sys.exit(0 if urllib.request.urlopen(f'http://localhost:{port}/health').status==200 else 1)"
 
-CMD ["python", "-m", "uvicorn", "app.server:app", "--host", "0.0.0.0", "--port", "8001"]
+CMD ["sh", "-c", "python -m uvicorn app.server:app --host 0.0.0.0 --port ${APP_PORT:-8001}"]
