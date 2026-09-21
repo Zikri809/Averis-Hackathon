@@ -31,6 +31,11 @@ recording and keep talking — never debug on stage.
 
 **Do:** open <http://localhost:8001/ui>, press **Run pipeline**.
 
+> The app serves `POST /run` from the mounted `/data` (seconds) while
+> `/health` still proves the inbox service is reachable — an HTTP-source run
+> is byte-identical but takes ~8 min against the single-worker inbox, so the
+> mount is the demo path and HTTP is the submit path.
+
 **Say:** "520 emails in, 520 records out. Classification resolves 85.6% at the
 rules layer with zero LLM calls; the remainder is TF-IDF similarity plus a
 frozen cache."
@@ -101,10 +106,18 @@ curl -s localhost:8001/review | python -m json.tool | head -30
 
 **Say:** "These are the cases the pipeline refuses to guess: five impostor
 documents, five missing attachments, five unreadable scans, five blank-field
-SIs. Escalation recall is 100% — it never calls an undecidable case clean."
+SIs, plus the binary pairs the text-only parsers decline. Escalation recall
+is 100% — it never calls an undecidable case clean."
+
+```bash
+curl -s localhost:8001/review/resolve -X POST -H "Content-Type: application/json" \
+  -d '{"action":"confirm-escalation","email_id":"email_506"}'
+```
 
 **Fallback:** the 20 edge cases are fixed and known (`email_501`–`email_520`);
-narrate them from the submission if the queue extension is not installed.
+narrate them from the submission if the network drops. The queue holds 45
+items live (20 edges + 25 binary-decline); the resolve call above is also
+covered by `tests/test_server.py::test_resolve_confirms_an_escalation`.
 
 ---
 

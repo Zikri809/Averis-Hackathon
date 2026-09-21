@@ -202,10 +202,11 @@ def test_extension_hooks_are_not_loaded_under_scored_run(monkeypatch):
     importlib.reload(state)
     importlib.reload(run_module)
     try:
-        sys.modules.pop("app.extensions.alias_learning", None)
+        for module_name in run_module.EXTENSION_MODULES:
+            sys.modules.pop(module_name, None)
         assert run_module.load_extensions() == []
-        assert "app.extensions.alias_learning" not in sys.modules
-        assert "app.extensions.review_queue" not in sys.modules
+        for module_name in run_module.EXTENSION_MODULES:
+            assert module_name not in sys.modules
     finally:
         monkeypatch.delenv("SCORED_RUN", raising=False)
         importlib.reload(state)

@@ -58,14 +58,54 @@ def test_run_writes_520_keys(client):
     assert all("category" in record for record in submission.values())
 
 
-def test_review_queue_is_empty_without_the_extension(client):
+def test_run_prefers_the_mounted_dataset_over_http(client, monkeypatch):
+    """O2/O3: with both configured, /run reads the /data mount (seconds),
+    while /health still reports the inbox service reachability."""
+    from app import server
+
+    monkeypatch.setattr(server, "INBOX_URL", "http://localhost:8000")
+    assert server._data_source() == str(server.state.DATA_DIR)
+
+    response = client.post("/run")
+    assert response.status_code == 200
+    assert response.json()["n_records"] == 520
+
+
+def test_review_queue_reports_no_submission_before_a_run(client):
+    """Plan 05 is landed: the queue projection exists but there is no data yet."""
     payload = client.get("/review").json()
     assert payload["items"] == []
-    assert "not installed" in payload["note"]
+    assert payload["note"] == "no submission yet"
 
 
-def test_resolve_is_501_without_the_extension(client):
-    assert client.post("/review/resolve", json={}).status_code == 501
+def test_review_queue_lists_needs_review_after_a_run(client):
+    """O3: after POST /run the queue projects the NEEDS_REVIEW records."""
+    assert client.post("/run").status_code == 200
+    payload = client.get("/review").json()
+    assert len(payload["items"]) > 0
+    assert {item["email_id"] for item in payload["items"]} <= set(
+        client.get("/submission").json()
+    )
+    assert all(item["review_reason"] for item in payload["items"])
+
+
+def test_resolve_rejects_an_empty_payload(client):
+    """Plan 05 is landed: unknown actions are 400, not 501."""
+    response = client.post("/review/resolve", json={})
+    assert response.status_code == 400
+    assert "unknown resolution action" in response.text
+
+
+def test_resolve_confirms_an_escalation(client):
+    response = client.post(
+        "/review/resolve",
+        json={"action": "confirm-escalation", "email_id": "email_506"},
+    )
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "confirmed-escalation",
+        "email_id": "email_506",
+    }
 
 
 def test_outbox_lists_and_serves_drafts(client, tmp_path):

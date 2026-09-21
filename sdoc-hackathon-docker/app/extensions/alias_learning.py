@@ -39,6 +39,12 @@ def _file_lock(path: Path) -> Iterator[None]:
             if time.monotonic() >= deadline:
                 raise TimeoutError(f"timed out waiting for lock {lock_path}")
             time.sleep(POLL_SECONDS)
+        except PermissionError:
+            # Windows: the lock file can be in delete-pending state after
+            # another thread unlinked it — treat as contention, not failure.
+            if time.monotonic() >= deadline:
+                raise TimeoutError(f"timed out waiting for lock {lock_path}")
+            time.sleep(POLL_SECONDS)
     try:
         os.write(fd, str(os.getpid()).encode("ascii", errors="ignore"))
         yield
