@@ -7,8 +7,8 @@ services:
     name: sdoc-app
     runtime: docker
     rootDir: sdoc-hackathon-docker
-    dockerfilePath: ./Dockerfile.app
-    dockerContext: .
+    dockerfilePath: sdoc-hackathon-docker/Dockerfile.app
+    dockerContext: sdoc-hackathon-docker
     healthCheckPath: /health
     envVars:
       - key: SCORED_RUN
