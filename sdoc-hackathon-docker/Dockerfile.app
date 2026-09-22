@@ -34,7 +34,10 @@ COPY data_v2/sample_submission.json /data/sample_submission.json
 # Pre-seed so GET /submission + /ui work instantly on cold start (no /run needed).
 # checkpoint.jsonl is deliberately NOT baked (stale-replay guard, PIPELINE_VERSION).
 COPY state/submission.json /state/submission.json
-COPY state/llm_cache.json /state/llm_cache.json
+# The LLM cache is an optional optimization (the app runs without it); copied
+# via the directory so the build survives when the cache file is absent.
+# .dockerignore allowlists only submission.json + llm_cache.json from state/.
+COPY state/ /state/
 
 RUN mkdir -p /state /outbox
 

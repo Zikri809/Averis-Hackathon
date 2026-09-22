@@ -5,12 +5,9 @@ data_v2/*.pyc
 **/__pycache__/
 **/*.pyc
 .pytest_cache/
-state/checkpoint.jsonl
-state/submission_a.json
-state/submission_b.json
-state/submission_c.json
-state/submission_frozen.json
-state/submission_normal.json
-state/submission_resumed.json
+# Bake only the pre-seed payloads; never checkpoints, variants, or learned state.
+state/*
+!state/submission.json
+!state/llm_cache.json
 outbox/
 .git/
