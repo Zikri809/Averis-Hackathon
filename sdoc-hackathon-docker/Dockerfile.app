@@ -18,21 +18,19 @@ RUN pip install --no-cache-dir \
     --trusted-host files.pythonhosted.org \
     -r requirements-app.txt
 
-COPY app ./app
-COPY tools ./tools
-COPY pytest.ini ./
-COPY tests ./tests
-# The organizers' loader is consumed read-only (loader_client wraps it); the
-# scoring module is needed by tools/score_local.py. Nothing else is copied.
-COPY server/loader.py server/scoring.py ./server/
+# Single-shot context copy. Per-file COPYs of repo paths proved unreliable on
+# Render's builder ("failed to compute cache key ... not found" on a different
+# file in every build, always the last COPY dispatched, for files verified
+# present in git via fresh clone + API) while directory COPYs never failed.
+# Assemble the runtime layout with RUN below so a missing context file fails
+# loudly with its own name instead of a cryptic checksum error.
+COPY . .
 
-# Live prototype dataset: 520 inbox JSON + 250 attachments + sample shape.
-# ground_truth.json is never copied (see .dockerignore).
-COPY data_v2/inbox /data/inbox
-COPY data_v2/attachments /data/attachments
-COPY data_v2/sample_submission.json /data/sample_submission.json
-
-RUN mkdir -p /state /outbox
+RUN mkdir -p /data /state /outbox \
+ && cp -r data_v2/inbox /data/inbox \
+ && cp -r data_v2/attachments /data/attachments \
+ && cp data_v2/sample_submission.json /data/sample_submission.json \
+ && echo "context: inbox=$(ls data_v2/inbox/email_*.json | wc -l) attachments=$(ls data_v2/attachments | wc -l)"
 
 ENV DATA_DIR=/data \
     STATE_DIR=/state \
