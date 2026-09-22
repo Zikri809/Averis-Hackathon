@@ -10,7 +10,15 @@ venv/
 # committed deliberately, so state/ is ignored by contents, not as a directory.
 sdoc-hackathon-docker/state/*
 !sdoc-hackathon-docker/state/llm_cache.json
+!sdoc-hackathon-docker/state/submission.json
 sdoc-hackathon-docker/submission.json
+
+# Organizers' answer key: never commit to the public repo.
+# Kept locally for score_local.py; excluded from the Render image via .dockerignore.
+sdoc-hackathon-docker/data_v2/ground_truth.json
+
+# Organizer distribution bundle (1MB, redundant with tracked sources)
+*.zip
 
 # Draft emails are never committed (plan 07 O2)
 sdoc-hackathon-docker/outbox/

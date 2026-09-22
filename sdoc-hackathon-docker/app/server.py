@@ -31,7 +31,7 @@ from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from . import state
 from .loader_client import LoaderClient
 
-APP_PORT = int(os.environ.get("APP_PORT", "8001"))
+APP_PORT = int(os.environ.get("PORT", os.environ.get("APP_PORT", "8001")))
 INBOX_URL = os.environ.get("INBOX_URL", "").rstrip("/")
 HEALTH_TIMEOUT = float(os.environ.get("INBOX_HEALTH_TIMEOUT", "3"))
 

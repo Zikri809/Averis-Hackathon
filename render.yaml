@@ -1,0 +1,25 @@
+# Render Blueprint for the SDOC live prototype (free tier viable).
+# Dashboard: New -> Blueprint -> select this repo. One web service is created.
+# Only the participant `app` is deployed — never the organizers' `inbox`
+# scorer (it holds data_v2/ground_truth.json, which is excluded via .dockerignore).
+services:
+  - type: web
+    name: sdoc-app
+    runtime: docker
+    rootDir: sdoc-hackathon-docker
+    dockerfilePath: ./Dockerfile.app
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: SCORED_RUN
+        value: 0
+      - key: DATA_DIR
+        value: /data
+      - key: STATE_DIR
+        value: /state
+      - key: OUTBOX_DIR
+        value: /outbox
+      - key: PYTHONUNBUFFERED
+        value: 1
+    # NOTE: Render injects $PORT automatically — do not set APP_PORT/PORT here.
+    # The image listens on ${PORT:-8001} (see Dockerfile.app CMD).

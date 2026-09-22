@@ -1,8 +1,10 @@
-# Participant pipeline image (plan 07 O1).
+# Participant pipeline image (plan 07 O1 + Render live overlay).
 #
 # Adds the parser dependencies the organizers' image omits (openpyxl,
-# python-docx, pymupdf) and copies the app + tools. The dataset and ground
-# truth are mounted, never baked in.
+# python-docx, pymupdf) and copies the app + tools. Locally the dataset is
+# mounted via compose (./data_v2:/data:ro); for the Render live prototype the
+# 520-email sample (inbox + attachments, ~1.3MB) is baked in below — never the
+# ground truth (excluded via .dockerignore).
 FROM python:3.13-slim
 
 WORKDIR /srv
@@ -24,6 +26,16 @@ COPY tests ./tests
 # scoring module is needed by tools/score_local.py. Nothing else is copied.
 COPY server/loader.py server/scoring.py ./server/
 
+# Live prototype dataset: 520 inbox JSON + 250 attachments + sample shape.
+# ground_truth.json is never copied (see .dockerignore).
+COPY data_v2/inbox /data/inbox
+COPY data_v2/attachments /data/attachments
+COPY data_v2/sample_submission.json /data/sample_submission.json
+# Pre-seed so GET /submission + /ui work instantly on cold start (no /run needed).
+# checkpoint.jsonl is deliberately NOT baked (stale-replay guard, PIPELINE_VERSION).
+COPY state/submission.json /state/submission.json
+COPY state/llm_cache.json /state/llm_cache.json
+
 RUN mkdir -p /state /outbox
 
 ENV DATA_DIR=/data \
@@ -35,6 +47,7 @@ ENV DATA_DIR=/data \
 EXPOSE 8001
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8001/health').status==200 else 1)"
+    CMD sh -c "python -c \"import urllib.request,os,sys; p=os.environ.get('PORT',os.environ.get('APP_PORT','8001')); sys.exit(0 if urllib.request.urlopen('http://localhost:'+str(p)+'/health').status==200 else 1)\""
 
-CMD ["python", "-m", "uvicorn", "app.server:app", "--host", "0.0.0.0", "--port", "8001"]
+# Render injects $PORT; local default stays 8001.
+CMD ["sh", "-c", "python -m uvicorn app.server:app --host 0.0.0.0 --port ${PORT:-8001}"]

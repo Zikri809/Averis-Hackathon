@@ -1,0 +1,16 @@
+# Render live image: never bake the answer key or local runtime state.
+data_v2/ground_truth.json
+data_v2/__pycache__/
+data_v2/*.pyc
+**/__pycache__/
+**/*.pyc
+.pytest_cache/
+state/checkpoint.jsonl
+state/submission_a.json
+state/submission_b.json
+state/submission_c.json
+state/submission_frozen.json
+state/submission_normal.json
+state/submission_resumed.json
+outbox/
+.git/
