@@ -6,7 +6,6 @@ services:
   - type: web
     name: sdoc-app
     runtime: docker
-    rootDir: sdoc-hackathon-docker
     dockerfilePath: sdoc-hackathon-docker/Dockerfile.app
     dockerContext: sdoc-hackathon-docker
     healthCheckPath: /health

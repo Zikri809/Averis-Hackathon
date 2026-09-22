@@ -32,12 +32,10 @@ COPY data_v2/inbox /data/inbox
 COPY data_v2/attachments /data/attachments
 COPY data_v2/sample_submission.json /data/sample_submission.json
 # Pre-seed so GET /submission + /ui work instantly on cold start (no /run needed).
-# checkpoint.jsonl is deliberately NOT baked (stale-replay guard, PIPELINE_VERSION).
-# llm_cache.json is deliberately NOT baked either: it is an optional runtime
-# optimization (the app falls back deterministically without it) and baking it
-# kept breaking the Render build. Re-add only with an explicit COPY once a full
-# regenerated cache is committed.
-COPY state/submission.json /state/submission.json
+# The seed lives in data_v2/ (a path proven to reach Render's build context);
+# state/ is deliberately never COPY'd (persistent "not found" on Render).
+# It is wired to $STATE_DIR/submission.json in the CMD at container start.
+COPY data_v2/render_seed_submission.json /srv/render_seed_submission.json
 
 RUN mkdir -p /state /outbox
 
@@ -52,5 +50,6 @@ EXPOSE 8001
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD sh -c "python -c \"import urllib.request,os,sys; p=os.environ.get('PORT',os.environ.get('APP_PORT','8001')); sys.exit(0 if urllib.request.urlopen('http://localhost:'+str(p)+'/health').status==200 else 1)\""
 
-# Render injects $PORT; local default stays 8001.
-CMD ["sh", "-c", "python -m uvicorn app.server:app --host 0.0.0.0 --port ${PORT:-8001}"]
+# Render injects $PORT; local default stays 8001. The seed file is copied into
+# $STATE_DIR at start (STATE_DIR may differ from /state in some setups).
+CMD ["sh", "-c", "mkdir -p ${STATE_DIR:-/state} && cp /srv/render_seed_submission.json ${STATE_DIR:-/state}/submission.json 2>/dev/null; exec python -m uvicorn app.server:app --host 0.0.0.0 --port ${PORT:-8001}"]
