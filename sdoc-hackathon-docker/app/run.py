@@ -202,9 +202,12 @@ def run_extensions(hooks: list[Any], submission: dict) -> None:
     for module_name, is_enabled in hooks:
         try:
             if is_enabled():
-                pass
+                runner = _load_attr(module_name, "run_hook")
+                if runner is not None:
+                    runner(submission)
         except Exception:
             print(f"[extensions] {module_name} hook failed (ignored)", file=sys.stderr)
+
 
 
 # ---------------------------------------------------------------------------

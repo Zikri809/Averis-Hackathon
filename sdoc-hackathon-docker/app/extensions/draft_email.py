@@ -12,7 +12,9 @@ BOOKING_RX = re.compile(r"\bBooking(?:\s+(?:Ref(?:erence)?|No\.?))?\s*[:#-]\s*([
 
 
 def is_enabled() -> bool:
-    return (not state.SCORED_RUN) and os.environ.get("ENABLE_DRAFT_EMAIL") == "1"
+    if state.SCORED_RUN:
+        return False
+    return os.environ.get("ENABLE_DRAFT_EMAIL", "1") in ("1", "true", "True")
 
 
 def booking_ref_from_evidence(diff_report: dict[str, dict] | None) -> str | None:
@@ -37,7 +39,8 @@ def _subject(email: dict) -> str:
     return f"DRAFT - clarification needed: {subject}"
 
 
-def render_body(email: dict, diff_report: dict[str, dict], booking_ref: str | None = None) -> str:
+def render_body_template(email: dict, diff_report: dict[str, dict], booking_ref: str | None = None) -> str:
+    """Deterministic template-based email body (always available offline)."""
     lines = [
         "DRAFT — NOT SENT",
         "",
@@ -63,7 +66,37 @@ def render_body(email: dict, diff_report: dict[str, dict], booking_ref: str | No
     return "\n".join(lines)
 
 
-def build_message(email: dict, diff_report: dict[str, dict], booking_ref: str | None = None) -> str:
+def render_body(
+    email: dict,
+    diff_report: dict[str, dict],
+    booking_ref: str | None = None,
+    *,
+    use_ai: bool = True,
+) -> str:
+    """Render draft clarification email body with AI, falling back to template."""
+    if use_ai and not state.SCORED_RUN:
+        try:
+            from .. import llm_client
+
+            ai_text = llm_client.draft_clarification_email(email, diff_report, booking_ref)
+            if ai_text:
+                ai_lines = ["DRAFT — NOT SENT", "", ai_text.strip()]
+                if booking_ref and f"Booking Ref: {booking_ref}" not in ai_text:
+                    ai_lines.extend(["", f"Booking Ref: {booking_ref}"])
+                ai_lines.extend(["", "DRAFT — NOT SENT"])
+                return "\n".join(ai_lines)
+        except Exception:
+            pass
+    return render_body_template(email, diff_report, booking_ref)
+
+
+def build_message(
+    email: dict,
+    diff_report: dict[str, dict],
+    booking_ref: str | None = None,
+    *,
+    use_ai: bool = True,
+) -> str:
     if state.SCORED_RUN:
         raise RuntimeError("draft emails are disabled for scored runs")
     recipient = _recipient(email)
@@ -76,11 +109,18 @@ def build_message(email: dict, diff_report: dict[str, dict], booking_ref: str | 
         "X-SDOC-Draft: DRAFT — NOT SENT",
         "Content-Type: text/plain; charset=utf-8",
     ]
-    body = render_body(email, diff_report, booking_ref or booking_ref_from_evidence(diff_report))
+    ref = booking_ref or booking_ref_from_evidence(diff_report)
+    body = render_body(email, diff_report, ref, use_ai=use_ai)
     return "\n".join(headers) + "\n\n" + body + "\n"
 
 
-def write_draft(email: dict, diff_report: dict[str, dict], outbox_dir: str | Path | None = None) -> Path:
+def write_draft(
+    email: dict,
+    diff_report: dict[str, dict],
+    outbox_dir: str | Path | None = None,
+    *,
+    use_ai: bool = True,
+) -> Path:
     if state.SCORED_RUN:
         raise RuntimeError("draft emails are disabled for scored runs")
     status = email.get("status")
@@ -92,7 +132,7 @@ def write_draft(email: dict, diff_report: dict[str, dict], outbox_dir: str | Pat
     outbox.mkdir(parents=True, exist_ok=True)
     email_id = str(email.get("email_id") or "draft")
     target = outbox / f"{email_id}.eml"
-    msg = build_message(email, diff_report)
+    msg = build_message(email, diff_report, use_ai=use_ai)
     tmp_path = target.with_name(target.name + f".{os.getpid()}.tmp")
     try:
         with tmp_path.open("w", encoding="utf-8", newline="\n") as tmp:
@@ -106,8 +146,90 @@ def write_draft(email: dict, diff_report: dict[str, dict], outbox_dir: str | Pat
     return target
 
 
-def draft_from_verdict(email: dict, verdict: Any, outbox_dir: str | Path | None = None) -> Path:
+def draft_from_verdict(
+    email: dict,
+    verdict: Any,
+    outbox_dir: str | Path | None = None,
+    *,
+    use_ai: bool = True,
+) -> Path:
     if not getattr(verdict, "has_defect", False):
         raise ValueError("drafts require a mismatch verdict")
     payload = {**email, "status": "MISMATCH"}
-    return write_draft(payload, getattr(verdict, "diff_report", {}), outbox_dir)
+    return write_draft(payload, getattr(verdict, "diff_report", {}), outbox_dir, use_ai=use_ai)
+
+
+def generate_drafts(
+    submission: dict[str, dict],
+    client: Any = None,
+    outbox_dir: str | Path | None = None,
+    *,
+    use_ai: bool = True,
+    max_ai: int = 5,
+) -> list[Path]:
+    """Generate drafts for MISMATCH records.
+
+    Prioritizes key demo emails (e.g. email_313, email_097).
+    Limits AI calls to `max_ai` to ensure fast completion and falls back to template.
+    """
+    if state.SCORED_RUN:
+        return []
+    if client is None:
+        from ..loader_client import LoaderClient
+
+        source = str(state.DATA_DIR)
+        try:
+            client = LoaderClient(source)
+        except Exception:
+            return []
+
+    try:
+        from ..stage2 import router
+        from ..stage2.binary_parsers import register_all
+
+        register_all(router)
+    except Exception:
+        pass
+
+    from ..run import compare_pair, extract_email
+
+    mismatches = [
+        eid
+        for eid, r in sorted(submission.items())
+        if isinstance(r, dict) and r.get("status") == "MISMATCH"
+    ]
+    demo_prio = ["email_313", "email_097", "email_031", "email_004"]
+    mismatches = [eid for eid in demo_prio if eid in mismatches] + [
+        eid for eid in mismatches if eid not in demo_prio
+    ]
+
+    generated: list[Path] = []
+    ai_count = 0
+
+    for eid in mismatches:
+        try:
+            email_data = client.get(eid)
+            cat = submission[eid].get("category", "BL_COMPARISON")
+            ext = extract_email(email_data, cat, client)
+            if not ext.ready or not ext.has_docs:
+                continue
+            verdict = compare_pair(ext)
+            if verdict is None or not verdict.has_defect:
+                continue
+
+            allow_ai = use_ai and (ai_count < max_ai)
+            path = draft_from_verdict(email_data, verdict, outbox_dir, use_ai=allow_ai)
+            generated.append(path)
+            if allow_ai:
+                ai_count += 1
+        except Exception:
+            continue
+
+    return generated
+
+
+def run_hook(submission: dict[str, dict]) -> None:
+    """Extension runner hook wired into run_extensions."""
+    if not is_enabled():
+        return
+    generate_drafts(submission)

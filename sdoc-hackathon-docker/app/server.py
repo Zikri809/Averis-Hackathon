@@ -198,6 +198,81 @@ def get_draft(name: str):
     return PlainTextResponse(target.read_text(encoding="utf-8", errors="replace"))
 
 
+@app.post("/outbox/generate")
+def generate_drafts_endpoint(use_ai: bool = True):
+    """Generate or update drafts for all MISMATCH records."""
+    module = _extension("draft_email")
+    if module is None:
+        raise HTTPException(501, "draft email extension not installed")
+    generator = getattr(module, "generate_drafts", None)
+    if generator is None:
+        raise HTTPException(501, "draft email generator not available")
+    try:
+        submission = _submission_payload()
+    except HTTPException:
+        raise HTTPException(400, "no submission available — run the pipeline first")
+    client = _client()
+    paths = generator(submission, client=client, use_ai=use_ai)
+    return {
+        "status": "ok",
+        "generated": [p.name for p in paths],
+        "count": len(paths),
+    }
+
+
+@app.post("/outbox/draft/{email_id}")
+def generate_single_draft_endpoint(email_id: str, use_ai: bool = True):
+    """Generate or regenerate draft for a specific MISMATCH email."""
+    module = _extension("draft_email")
+    if module is None:
+        raise HTTPException(501, "draft email extension not installed")
+    draft_from_verdict = getattr(module, "draft_from_verdict", None)
+    if draft_from_verdict is None:
+        raise HTTPException(501, "draft_from_verdict not available")
+
+    try:
+        submission = _submission_payload()
+    except HTTPException:
+        raise HTTPException(400, "no submission available — run the pipeline first")
+
+    record = submission.get(email_id)
+    if not record or record.get("status") != "MISMATCH":
+        raise HTTPException(400, f"{email_id} is not a MISMATCH case")
+
+    client = _client()
+    try:
+        email_data = client.get(email_id)
+    except Exception as exc:
+        raise HTTPException(404, f"could not load email {email_id}: {exc}")
+
+    try:
+        from .stage2 import router
+        from .stage2.binary_parsers import register_all
+
+        register_all(router)
+    except Exception:
+        pass
+
+    from .run import compare_pair, extract_email
+
+    cat = record.get("category", "BL_COMPARISON")
+    ext = extract_email(email_data, cat, client)
+    if not ext.ready or not ext.has_docs:
+        raise HTTPException(400, f"email {email_id} documents not ready")
+    verdict = compare_pair(ext)
+    if verdict is None or not verdict.has_defect:
+        raise HTTPException(400, f"email {email_id} has no defect verdict")
+
+    path = draft_from_verdict(email_data, verdict, use_ai=use_ai)
+    return {
+        "status": "ok",
+        "email_id": email_id,
+        "path": path.name,
+        "content": path.read_text(encoding="utf-8", errors="replace"),
+    }
+
+
+
 @app.get("/ui")
 def ui():
     index = Path(__file__).resolve().parent / "ui" / "index.html"

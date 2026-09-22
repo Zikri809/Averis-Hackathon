@@ -70,9 +70,14 @@
     <tbody></tbody>
   </table>
 
-  <h2>Draft outbox</h2>
+  <div style="display: flex; align-items: baseline; gap: 16px;">
+    <h2>Draft outbox</h2>
+    <button id="generate-drafts" class="secondary" style="font-size: 12px; padding: 4px 10px;">Draft Mismatches (AI)</button>
+    <span id="outbox-status" class="muted" style="font-size: 12px;"></span>
+  </div>
   <div id="outbox" class="muted">No drafts.</div>
   <div id="draft"></div>
+
 
   <script>
     const $ = (id) => document.getElementById(id);
@@ -182,6 +187,20 @@
     }
 
     $("refresh").onclick = refresh;
+    $("generate-drafts").onclick = async () => {
+      $("generate-drafts").disabled = true;
+      $("outbox-status").textContent = "drafting…";
+      try {
+        const res = await fetch("/outbox/generate", { method: "POST" });
+        const data = await res.json();
+        $("outbox-status").textContent = `ready: ${data.count || 0} drafts`;
+        await refresh();
+      } catch (err) {
+        $("outbox-status").textContent = `failed: ${err.message}`;
+      } finally {
+        $("generate-drafts").disabled = false;
+      }
+    };
     $("run").onclick = async () => {
       $("run").disabled = true;
       setStatus("running…");

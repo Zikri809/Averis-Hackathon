@@ -20,5 +20,8 @@ services:
         value: /outbox
       - key: PYTHONUNBUFFERED
         value: 1
+      - key: ENABLE_DRAFT_EMAIL
+        value: 1
+
     # NOTE: Render injects $PORT automatically — do not set APP_PORT/PORT here.
     # The image listens on ${PORT:-8001} (see Dockerfile.app CMD).
